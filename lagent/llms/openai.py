@@ -11,6 +11,7 @@ import requests
 from .base_api import BaseAPIModel
 
 OPENAI_API_BASE = 'https://api.openai.com/v1/chat/completions'
+ALLES_API_BASE = 'http://ecs.sv.us.alles-apin.openxlab.org.cn/v1/openai/v2/text/chat'
 
 
 class GPTAPI(BaseAPIModel):
@@ -177,6 +178,7 @@ class GPTAPI(BaseAPIModel):
             header = {
                 'Authorization': f'Bearer {key}',
                 'content-type': 'application/json',
+                'alles-apin-token': key,
             }
 
             if self.orgs:
@@ -206,19 +208,10 @@ class GPTAPI(BaseAPIModel):
                 print('JsonDecode error, got', str(raw_response.content))
                 continue
             try:
+                response = response.get('data', response)
                 return response['choices'][0]['message']['content'].strip()
-            except KeyError:
-                if 'error' in response:
-                    if response['error']['code'] == 'rate_limit_exceeded':
-                        time.sleep(1)
-                        continue
-                    elif response['error']['code'] == 'insufficient_quota':
-                        self.invalid_keys.add(key)
-                        self.logger.warn(f'insufficient_quota key: {key}')
-                        continue
-
-                    print('Find error message in response: ',
-                          str(response['error']))
+            except (KeyError, TypeError):
+                self.logger.warn(str(response))
             max_num_retries += 1
 
         raise RuntimeError('Calling OpenAI failed after retrying for '
